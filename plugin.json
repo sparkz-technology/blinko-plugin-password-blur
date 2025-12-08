@@ -1,19 +1,19 @@
 {
-  "name": "blinko-plugin-demo",
-  "author": "blinko-offical",
-  "url": "https://github.com/blinko-space/blinko-plugin-template",
-  "version": "0.0.4",
-  "minAppVersion": "0.0.0",
+  "name": "blinko-plugin-password-blur",
+  "author": "User",
+  "url": "https://github.com/blinko-space/blinko-plugin-password-blur",
+  "version": "1.0.0",
+  "minAppVersion": "0.0.1",
   "displayName": {
-    "default": "Blinko plugin demo",
-    "zh": "Blinko插件示例"
+    "default": "Password Blur",
+    "zh": "密码模糊"
   },
   "description": {
-    "default": "This is a blinko plugin demo, you can use it as a template to create your own plugin.",
-    "zh": "这是一个blinko插件示例，你可以使用它作为模板来创建自己的插件。"
+    "default": "Blur sensitive passwords in your notes. Use [[password]] format to automatically blur text. Hover to reveal, click to copy.",
+    "zh": "在笔记中模糊敏感密码。使用 [[密码]] 格式自动模糊文本。悬停显示，点击复制。"
   },
   "readme": {
-    "default": "README.md",
-    "zh": "README_zh.md"
-  }
+    "default": "README.md"
+  },
+  "icon": "🔐"
 }

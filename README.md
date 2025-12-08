@@ -1,74 +1,60 @@
-# Blinko Plugin Template
+# Password Blur Plugin
 
-A template for building Blinko plugins quickly and efficiently.
+A simple and elegant Blinko plugin that blurs sensitive passwords in your notes using CSS blur effect.
 
-[Blinko Plugin Development Documentation](https://blinko.mintlify.app/plugins/get-started)
+## Features
 
-## 🚀 Quick Start
+- **Easy Format**: Use `[[password]]` syntax to automatically blur text
+- **Hover to Reveal**: Hover over blurred text to see the actual password
+- **One-Click Copy**: Click on the blurred text to copy to clipboard
+- **CSS Blur**: Uses native CSS blur filter for smooth performance
+- **Dark/Light Theme**: Automatically adapts to your system theme
+- **Bilingual**: Supports English and Chinese
+
+## Installation
 
 1. Clone this repository
-```bash
-git clone https://github.com/blinko-space/blinko-plugin-template.git
-cd blinko-plugin-template
-```
+2. Run `bun install`
+3. Run `bun run release:publish` to build the plugin
+4. Upload the generated plugin to your Blinko instance
 
-2. Install dependencies
-```bash
-bun install
-```
+## Usage
 
-3. Start development server
-```bash
-bun run dev
-```
+### Basic Usage
 
-4. Visit `http://localhost:3000` for connection instructions
+1. Open a note in Blinko
+2. Type your password or sensitive text
+3. Wrap it with double brackets: `[[myPassword123]]`
+4. The text will automatically be blurred
 
-## 📖 Official Documentation
+### Interactions
 
-> ⭐ **Important: Please visit [Blinko Plugin Development Documentation](https://blinko.mintlify.app/plugins/get-started) for complete development guides and best practices!**
+- **Hover**: Move your mouse over the blurred text to reveal it
+- **Click**: Click on the text to copy it to clipboard
+- **Edit**: Press backspace to remove the blur and edit the text normally
 
-## 🛠️ Development Commands
-
-- `bun run dev` - Start development server
-- `bun run release:publish` - Build and publish plugin
-
-## 📁 Directory Structure
+## Example
 
 ```
-├── src/              # Source code directory
-├── dist/            # Development build output
-├── release/         # Production build output
-├── plugin.json      # Plugin configuration
-└── vite.config.ts   # Vite configuration
+My login credentials:
+Username: john_doe
+Password: [[secretPassword123]]
+API Key: [[sk-1234567890abcdef]]
 ```
 
-## 🔧 Configuration
+When rendered, the passwords will appear blurred and can be revealed on hover.
 
-Configure your plugin in `plugin.json`:
+## How It Works
 
-```json
-{
-  "name": "blinko-plugin-demo",
-  "author": "blinko-offical",
-  "url": "https://github.com/blinko-space/blinko-plugin-template",
-  "version": "0.0.4",
-  "minAppVersion": "0.0.0",
-  "displayName": {
-    "default": "Blinko plugin demo",
-    "zh": "Blinko插件示例"
-  },
-  "description": {
-    "default": "This is a blinko plugin demo, you can use it as a template to create your own plugin.",
-    "zh": "这是一个blinko插件示例，你可以使用它作为模板来创建自己的插件。"
-  },
-  "readme": {
-    "default": "README.md",
-    "zh": "README_zh.md"
-  }
-}
-```
+The plugin scans your note content for the `[[...]]` pattern and automatically:
+1. Wraps the text in a span element
+2. Applies CSS blur filter (4px)
+3. Removes blur on hover
+4. Enables copy-to-clipboard on click
 
-## 📝 License
+## Performance
 
-MIT
+- Debounced processing (300ms) to avoid lag
+- Tracks processed nodes to prevent re-processing
+- Minimal CSS overhead
+- No external dependencies

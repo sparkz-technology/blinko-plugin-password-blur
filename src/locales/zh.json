@@ -1,5 +1,6 @@
 {
-  "title": "我的插件",
-  "countLabel": "计数为 {{count}}",
-  "successMessage": "成功！"
+  "title": "密码模糊插件",
+  "description": "在笔记中模糊敏感密码",
+  "copied": "✓ 已复制",
+  "hoverToReveal": "悬停显示 • 点击复制"
 } 

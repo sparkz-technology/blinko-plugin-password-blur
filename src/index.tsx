@@ -1,103 +1,111 @@
-/** @jsxImportSource preact */
 /// <reference types="systemjs" />
 
-import { render } from 'preact/compat';
-import { App } from "./app";
 import type { BasePlugin } from 'blinko';
-import { Setting } from './setting';
 import plugin from '../plugin.json';
-import en from './locales/en.json';
-import zh from './locales/zh.json';
 
-/**
- * Main plugin entry point registered with SystemJS
- * Exports the plugin class implementing BasePlugin interface
- */
 System.register([], (exports) => ({
   execute: () => {
     exports('default', class Plugin implements BasePlugin {
       constructor() {
-        // Initialize plugin with metadata from plugin.json
         Object.assign(this, plugin);
       }
 
-      // Flag indicating this plugin has a settings panel
-      withSettingPanel = true;
+      private debounceTimer: any = null;
+      private processedNodes = new WeakSet();
 
-      /**
-       * Renders the settings panel UI
-       * @returns {HTMLElement} Container element with rendered settings component
-       */
-      renderSettingPanel = () => {
-        const container = document.createElement('div');
-        render(<Setting />, container);
-        return container;
-      }
-
-      /**
-       * Initializes the plugin
-       * Sets up toolbar icons, right-click menus, and AI write prompts
-       */
       async init() {
-        // Initialize internationalization
-        this.initI18n();
+        console.log('Password Block Plugin Initialized');
         
-        // Add toolbar icon with click handler
-        window.Blinko.addToolBarIcon({
-          name: "test",
-          icon: "<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-file'><path d='M13 3H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/><polyline points='14 3 14 9 19 9'/></svg>",
-          placement: 'top',
-          tooltip: 'testtootip',
-          content: () => {
-            const container = document.createElement('div');
-            container.setAttribute('data-plugin', 'my-note-plugin');
-            render(<App />, container);
-            return container;
+        // Add CSS for blur effect
+        const style = document.createElement('style');
+        style.textContent = `
+          .password-field {
+            filter: blur(4px);
+            transition: filter 0.2s ease;
+            cursor: pointer;
+            user-select: none;
+            padding: 2px 4px;
+            border-radius: 3px;
+            display: inline-block;
           }
-        });
-
-        // Add custom right-click menu item
-        window.Blinko.addRightClickMenu({
-          name: 'custom-action',
-          label: 'Custom Action',
-          icon: 'tabler:accessible',  
-          onClick: (item) => {
-            console.log('Custom action triggered', item)
+          .password-field:hover {
+            filter: blur(0px);
           }
-        });
-
-        // Add AI write prompt for translation
-        window.Blinko.addAiWritePrompt(
-          'Translate Content',
-          'Please translate the following content into English:',
-          'material-symbols:translate'
-        );
-
-        // window.Blinko.showDialog({
-        //   title: 'Dialog',
-        //   content: () => {
-        //     const container = document.createElement('div');
-        //     container.setAttribute('data-plugin', 'my-note-plugin');
-        //     render(<App />, container);
-        //     return container;
-        //   }
-        // })
+        `;
+        document.head.appendChild(style);
+        
+        // Process editor content to find [[password]] patterns
+        const processContent = () => {
+          const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+            null
+          );
+          
+          const nodesToReplace: any[] = [];
+          let node;
+          
+          while (node = walker.nextNode()) {
+            // Skip already processed nodes
+            if (this.processedNodes.has(node)) continue;
+            
+            const text = node.textContent || '';
+            if (text.includes('[[') && text.includes(']]')) {
+              const regex = /\[\[([^\[\]]+)\]\]/g;
+              let match;
+              
+              while ((match = regex.exec(text)) !== null) {
+                nodesToReplace.push({
+                  node,
+                  match: match[0],
+                  password: match[1]
+                });
+              }
+            }
+          }
+          
+          // Replace found patterns
+          nodesToReplace.forEach(({ node, match, password }) => {
+            const span = document.createElement('span');
+            span.className = 'password-field';
+            span.setAttribute('data-password', password);
+            span.textContent = match;
+            
+            span.addEventListener('click', (e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(password);
+              window.Blinko.toast.success('✓ Copied');
+            });
+            
+            const parent = node.parentNode;
+            if (parent) {
+              const text = node.textContent || '';
+              const idx = text.indexOf(match);
+              const before = text.substring(0, idx);
+              const after = text.substring(idx + match.length);
+              
+              if (before) parent.insertBefore(document.createTextNode(before), node);
+              parent.insertBefore(span, node);
+              if (after) parent.insertBefore(document.createTextNode(after), node);
+              parent.removeChild(node);
+              
+              this.processedNodes.add(span);
+            }
+          });
+        };
+        
+        // Process on init
+        setTimeout(processContent, 500);
+        
+        // Debounced input handler
+        document.addEventListener('input', () => {
+          clearTimeout(this.debounceTimer);
+          this.debounceTimer = setTimeout(processContent, 300);
+        }, true);
       }
 
-      /**
-       * Initializes internationalization resources
-       * Adds English and Chinese translation bundles
-       */
-      initI18n() {
-        window.Blinko.i18n.addResourceBundle('en', 'translation', en);
-        window.Blinko.i18n.addResourceBundle('zh', 'translation', zh);
-      }
-
-      /**
-       * Cleanup function called when plugin is disabled
-       */
       destroy() {
-        console.log('Plugin destroyed');
+        // Cleanup if necessary
       }
     });
   }

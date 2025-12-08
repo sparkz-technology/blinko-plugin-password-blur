@@ -1,5 +1,6 @@
 {
-  "title": "My Plugin",
-  "countLabel": "Count is {{count}}",
-  "successMessage": "Success!"
+  "title": "Password Blur Plugin",
+  "description": "Blur sensitive passwords in your notes",
+  "copied": "✓ Copied",
+  "hoverToReveal": "Hover to reveal • Click to copy"
 } 
