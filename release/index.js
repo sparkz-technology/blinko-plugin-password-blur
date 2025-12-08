@@ -2,9 +2,9 @@
   const m = {
     name: "blinko-plugin-password-blur",
     author: "User",
-    url: "https://github.com/blinko-space/blinko-plugin-password-blur",
-    version: "1.0.0",
-    minAppVersion: "0.0.1",
+    url: "https://github.com/sparkz-technology/blinko-plugin-password-blur",
+    version: "v1.0.0",
+    minAppVersion: "v1.0.0",
     displayName: {
       default: "Password Blur",
       zh: "密码模糊"
