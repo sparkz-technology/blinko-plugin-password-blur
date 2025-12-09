@@ -1,5 +1,5 @@
 (function() {
-  const h = {
+  const u = {
     name: "blinko-plugin-password-blur",
     author: "User",
     url: "https://github.com/sparkz-technology/blinko-plugin-password-blur",
@@ -18,20 +18,19 @@
     },
     icon: "🔐"
   };
-  System.register([], (b) => ({
+  System.register([], (p) => ({
     execute: () => {
-      b("default", class {
+      p("default", class {
         constructor() {
-          Object.assign(this, h);
+          Object.assign(this, u);
         }
         debounceTimer = null;
         observer = null;
         processedNodes = /* @__PURE__ */ new WeakSet();
-        isEditorMode = !0;
+        styleElement = null;
+        lastUrl = "";
         async init() {
-          console.log("Password Blur Plugin Initialized");
-          const r = document.createElement("style");
-          r.textContent = `.password-field {
+          console.log("Password Blur Plugin Initialized"), this.styleElement = document.createElement("style"), this.styleElement.textContent = `.password-field {
 filter: blur(4px);
 transition: filter 0.2s ease;
 cursor: pointer;
@@ -42,83 +41,51 @@ display: inline-block;
 }
 .password-field:hover {
 filter: blur(0px);
-}`, document.head.appendChild(r), this.isEditorMode = !document.querySelector('[data-testid="viewer"]') && !document.body.classList.contains("viewer-mode"), this.isEditorMode ? this.initEditorMode() : this.initViewerMode();
+}`, document.head.appendChild(this.styleElement), this.lastUrl = location.href, this.startObserving(), this.watchForNavigation();
         }
-        initEditorMode() {
-          console.log("Password Blur: Editor Mode (non-invasive)");
-          const r = () => {
-            const e = document.activeElement;
-            if (e && (e.tagName === "INPUT" || e.tagName === "TEXTAREA" || e.isContentEditable || e.closest('[contenteditable="true"]'))) return;
-            const s = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null), d = [];
-            let n;
-            for (; n = s.nextNode(); ) {
-              if (n.parentElement && n.parentElement.classList.contains("password-field") || this.processedNodes.has(n)) continue;
-              const i = n.textContent || "";
-              i.includes("[[") && i.includes("]]") && d.push(n);
-            }
-            d.forEach((i) => {
-              const c = i.textContent || "", a = /\[\[([^\[\]]+)\]\]/g;
-              if (!a.test(c)) return;
-              a.lastIndex = 0;
-              const o = document.createDocumentFragment();
-              let l = 0, t;
-              for (; (t = a.exec(c)) !== null; ) {
-                t.index > l && o.appendChild(document.createTextNode(c.slice(l, t.index)));
-                const m = t[1], p = document.createElement("span");
-                p.className = "password-field", p.setAttribute("data-password", m), p.textContent = t[0], p.addEventListener("click", (f) => {
-                  f.stopPropagation(), navigator.clipboard.writeText(m), window.Blinko.toast.success("✓ Copied");
-                }), o.appendChild(p), this.processedNodes.add(p), l = t.index + t[0].length;
-              }
-              l < c.length && o.appendChild(document.createTextNode(c.slice(l))), i.parentNode && i.parentNode.replaceChild(o, i);
-            });
-          };
-          document.addEventListener("focusout", () => {
-            clearTimeout(this.debounceTimer), this.debounceTimer = setTimeout(r, 200);
-          }), document.addEventListener("visibilitychange", () => {
-            document.hidden || (clearTimeout(this.debounceTimer), this.debounceTimer = setTimeout(r, 200));
-          }), this.observer = new MutationObserver(() => {
-            const e = document.activeElement;
-            e && (e.tagName === "INPUT" || e.tagName === "TEXTAREA" || e.isContentEditable || e.closest('[contenteditable="true"]')) || (clearTimeout(this.debounceTimer), this.debounceTimer = setTimeout(r, 100));
-          }), this.observer.observe(document.body, { childList: !0, subtree: !0 }), r();
+        watchForNavigation() {
+          setInterval(() => {
+            location.href !== this.lastUrl && (this.lastUrl = location.href, console.log("Password Blur: Page changed, re-processing"), this.processedNodes = /* @__PURE__ */ new WeakSet(), this.processContent());
+          }, 500), window.addEventListener("popstate", () => {
+            this.processedNodes = /* @__PURE__ */ new WeakSet(), setTimeout(() => this.processContent(), 100);
+          });
         }
-        initViewerMode() {
-          console.log("Password Blur: Viewer Mode (full blur)");
-          const r = () => {
-            const e = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null), u = [];
-            let s;
-            for (; s = e.nextNode(); ) {
-              if (s.parentElement && s.parentElement.classList.contains("password-field") || this.processedNodes.has(s)) continue;
-              const d = s.textContent || "";
-              d.includes("[[") && d.includes("]]") && u.push(s);
+        startObserving() {
+          this.observer = new MutationObserver(() => {
+            clearTimeout(this.debounceTimer), this.debounceTimer = setTimeout(() => this.processContent(), 100);
+          }), this.observer.observe(document.body, {
+            childList: !0,
+            subtree: !0
+          }), this.processContent();
+        }
+        processContent() {
+          const n = document.activeElement;
+          if (n && (n.tagName === "INPUT" || n.tagName === "TEXTAREA" || n.isContentEditable || n.closest('[contenteditable="true"]'))) return;
+          const h = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null), c = [];
+          let o;
+          for (; o = h.nextNode(); ) {
+            if (o.parentElement?.classList.contains("password-field") || this.processedNodes.has(o)) continue;
+            const e = o.textContent || "";
+            e.includes("[[") && e.includes("]]") && c.push(o);
+          }
+          c.forEach((e) => {
+            const i = e.textContent || "", a = /\[\[([^\[\]]+)\]\]/g;
+            if (!a.test(i)) return;
+            a.lastIndex = 0;
+            const l = document.createDocumentFragment();
+            let r = 0, t;
+            for (; (t = a.exec(i)) !== null; ) {
+              t.index > r && l.appendChild(document.createTextNode(i.slice(r, t.index)));
+              const d = t[1], s = document.createElement("span");
+              s.className = "password-field", s.setAttribute("data-password", d), s.textContent = t[0], s.addEventListener("click", (m) => {
+                m.stopPropagation(), navigator.clipboard.writeText(d), window.Blinko.toast.success("✓ Copied");
+              }), l.appendChild(s), this.processedNodes.add(s), r = t.index + t[0].length;
             }
-            u.forEach((d) => {
-              const n = d.textContent || "", i = /\[\[([^\[\]]+)\]\]/g;
-              if (!i.test(n)) return;
-              i.lastIndex = 0;
-              const c = document.createDocumentFragment();
-              let a = 0, o;
-              for (; (o = i.exec(n)) !== null; ) {
-                o.index > a && c.appendChild(document.createTextNode(n.slice(a, o.index)));
-                const l = o[1], t = document.createElement("span");
-                t.className = "password-field", t.setAttribute("data-password", l), t.textContent = o[0], t.addEventListener("click", (m) => {
-                  m.stopPropagation(), navigator.clipboard.writeText(l), window.Blinko.toast.success("✓ Copied");
-                }), c.appendChild(t), this.processedNodes.add(t), a = o.index + o[0].length;
-              }
-              a < n.length && c.appendChild(document.createTextNode(n.slice(a))), d.parentNode && d.parentNode.replaceChild(c, d);
-            });
-          };
-          this.observer = new MutationObserver((e) => {
-            let u = !1;
-            for (const s of e)
-              if (!(s.type === "attributes" && s.target.classList?.contains("password-field")) && (s.type === "childList" || s.type === "characterData")) {
-                u = !0;
-                break;
-              }
-            u && (clearTimeout(this.debounceTimer), this.debounceTimer = setTimeout(r, 100));
-          }), this.observer.observe(document.body, { childList: !0, subtree: !0, characterData: !0 }), r();
+            r < i.length && l.appendChild(document.createTextNode(i.slice(r))), e.parentNode && e.parentNode.replaceChild(l, e);
+          });
         }
         destroy() {
-          this.observer && (this.observer.disconnect(), this.observer = null), clearTimeout(this.debounceTimer);
+          this.observer && (this.observer.disconnect(), this.observer = null), this.styleElement && (this.styleElement.remove(), this.styleElement = null), clearTimeout(this.debounceTimer);
         }
       });
     }

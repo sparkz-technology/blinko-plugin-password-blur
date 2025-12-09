@@ -13,14 +13,15 @@ System.register([], (exports) => ({
       private debounceTimer: any = null;
       private observer: MutationObserver | null = null;
       private processedNodes = new WeakSet();
-      private isEditorMode = true;
+      private styleElement: HTMLStyleElement | null = null;
+      private lastUrl = '';
 
       async init() {
         console.log('Password Blur Plugin Initialized');
         
         // Add CSS
-        const style = document.createElement('style');
-        style.textContent = `.password-field {
+        this.styleElement = document.createElement('style');
+        this.styleElement.textContent = `.password-field {
 filter: blur(4px);
 transition: filter 0.2s ease;
 cursor: pointer;
@@ -32,218 +33,132 @@ display: inline-block;
 .password-field:hover {
 filter: blur(0px);
 }`;
-        document.head.appendChild(style);
+        document.head.appendChild(this.styleElement);
         
-        // Detect if we're in editor or viewer mode
-        this.isEditorMode = !document.querySelector('[data-testid="viewer"]') && 
-                           !document.body.classList.contains('viewer-mode');
+        // Track URL for page changes
+        this.lastUrl = location.href;
         
-        if (this.isEditorMode) {
-          this.initEditorMode();
-        } else {
-          this.initViewerMode();
-        }
+        // Start observing
+        this.startObserving();
+        
+        // Listen for URL changes (SPA navigation)
+        this.watchForNavigation();
       }
 
-      private initEditorMode() {
-        console.log('Password Blur: Editor Mode (non-invasive)');
-        
-        const processContent = () => {
-          // Check if user is currently focused on an editable element
-          const activeEl = document.activeElement;
-          const isEditing = activeEl && (
-            activeEl.tagName === 'INPUT' ||
-            activeEl.tagName === 'TEXTAREA' ||
-            (activeEl as HTMLElement).isContentEditable ||
-            activeEl.closest('[contenteditable="true"]')
-          );
-          
-          // Don't process while user is actively editing
-          if (isEditing) return;
-          
-          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-          const nodesToProcess: Node[] = [];
-          let node;
-          
-          while (node = walker.nextNode()) {
-            if (node.parentElement && node.parentElement.classList.contains('password-field')) {
-              continue;
-            }
-            if (this.processedNodes.has(node)) continue;
-            
-            const text = node.textContent || '';
-            if (text.includes('[[') && text.includes(']]')) {
-              nodesToProcess.push(node);
-            }
+      private watchForNavigation() {
+        // Check for URL changes periodically (handles pushState/replaceState)
+        setInterval(() => {
+          if (location.href !== this.lastUrl) {
+            this.lastUrl = location.href;
+            console.log('Password Blur: Page changed, re-processing');
+            // Clear processed nodes on page change since DOM is new
+            this.processedNodes = new WeakSet();
+            this.processContent();
           }
-          
-          nodesToProcess.forEach((textNode) => {
-            const text = textNode.textContent || '';
-            const regex = /\[\[([^\[\]]+)\]\]/g;
-            if (!regex.test(text)) return;
-            regex.lastIndex = 0;
-            
-            const fragment = document.createDocumentFragment();
-            let lastIndex = 0;
-            let match;
-            
-            while ((match = regex.exec(text)) !== null) {
-              if (match.index > lastIndex) {
-                fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-              }
-              
-              const password = match[1];
-              const span = document.createElement('span');
-              span.className = 'password-field';
-              span.setAttribute('data-password', password);
-              span.textContent = match[0];
-              
-              span.addEventListener('click', (e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(password);
-                window.Blinko.toast.success('✓ Copied');
-              });
-              
-              fragment.appendChild(span);
-              this.processedNodes.add(span);
-              lastIndex = match.index + match[0].length;
-            }
-            
-            if (lastIndex < text.length) {
-              fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
-            }
-            
-            if (textNode.parentNode) {
-              textNode.parentNode.replaceChild(fragment, textNode);
-            }
-          });
-        };
-        
-        // Process when user clicks away from editor (blur)
-        document.addEventListener('focusout', () => {
-          clearTimeout(this.debounceTimer);
-          this.debounceTimer = setTimeout(processContent, 200);
+        }, 500);
+
+        // Also listen for popstate (back/forward navigation)
+        window.addEventListener('popstate', () => {
+          this.processedNodes = new WeakSet();
+          setTimeout(() => this.processContent(), 100);
         });
-        
-        // Process on page visibility change (tab switch back)
-        document.addEventListener('visibilitychange', () => {
-          if (!document.hidden) {
-            clearTimeout(this.debounceTimer);
-            this.debounceTimer = setTimeout(processContent, 200);
-          }
-        });
-        
-        // Watch for new content added (but not while editing)
+      }
+
+      private startObserving() {
+        // Process content on mutations
         this.observer = new MutationObserver(() => {
-          const activeEl = document.activeElement;
-          const isEditing = activeEl && (
-            activeEl.tagName === 'INPUT' ||
-            activeEl.tagName === 'TEXTAREA' ||
-            (activeEl as HTMLElement).isContentEditable ||
-            activeEl.closest('[contenteditable="true"]')
-          );
-          
-          if (!isEditing) {
-            clearTimeout(this.debounceTimer);
-            this.debounceTimer = setTimeout(processContent, 100);
-          }
+          clearTimeout(this.debounceTimer);
+          this.debounceTimer = setTimeout(() => this.processContent(), 100);
         });
         
-        this.observer.observe(document.body, { childList: true, subtree: true });
+        this.observer.observe(document.body, { 
+          childList: true, 
+          subtree: true 
+        });
         
-        // Initial run
-        processContent();
+        // Initial processing
+        this.processContent();
       }
 
-      private initViewerMode() {
-        console.log('Password Blur: Viewer Mode (full blur)');
+      private processContent() {
+        // Skip if user is actively editing
+        const activeEl = document.activeElement;
+        const isEditing = activeEl && (
+          activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable ||
+          activeEl.closest('[contenteditable="true"]')
+        );
         
-        // For viewer: process on all changes including typing
-        const processContent = () => {
-          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-          const nodesToProcess: Node[] = [];
-          let node;
+        if (isEditing) return;
+        
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+        const nodesToProcess: Node[] = [];
+        let node;
+        
+        while (node = walker.nextNode()) {
+          // Skip already processed password fields
+          if (node.parentElement?.classList.contains('password-field')) {
+            continue;
+          }
+          if (this.processedNodes.has(node)) continue;
           
-          while (node = walker.nextNode()) {
-            if (node.parentElement && node.parentElement.classList.contains('password-field')) {
-              continue;
+          const text = node.textContent || '';
+          if (text.includes('[[') && text.includes(']]')) {
+            nodesToProcess.push(node);
+          }
+        }
+        
+        nodesToProcess.forEach((textNode) => {
+          const text = textNode.textContent || '';
+          const regex = /\[\[([^\[\]]+)\]\]/g;
+          if (!regex.test(text)) return;
+          regex.lastIndex = 0;
+          
+          const fragment = document.createDocumentFragment();
+          let lastIndex = 0;
+          let match;
+          
+          while ((match = regex.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+              fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
             }
-            if (this.processedNodes.has(node)) continue;
             
-            const text = node.textContent || '';
-            if (text.includes('[[') && text.includes(']]')) {
-              nodesToProcess.push(node);
-            }
+            const password = match[1];
+            const span = document.createElement('span');
+            span.className = 'password-field';
+            span.setAttribute('data-password', password);
+            span.textContent = match[0];
+            
+            span.addEventListener('click', (e) => {
+              e.stopPropagation();
+              navigator.clipboard.writeText(password);
+              window.Blinko.toast.success('✓ Copied');
+            });
+            
+            fragment.appendChild(span);
+            this.processedNodes.add(span);
+            lastIndex = match.index + match[0].length;
           }
           
-          nodesToProcess.forEach((textNode) => {
-            const text = textNode.textContent || '';
-            const regex = /\[\[([^\[\]]+)\]\]/g;
-            if (!regex.test(text)) return;
-            regex.lastIndex = 0;
-            
-            const fragment = document.createDocumentFragment();
-            let lastIndex = 0;
-            let match;
-            
-            while ((match = regex.exec(text)) !== null) {
-              if (match.index > lastIndex) {
-                fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
-              }
-              
-              const password = match[1];
-              const span = document.createElement('span');
-              span.className = 'password-field';
-              span.setAttribute('data-password', password);
-              span.textContent = match[0];
-              
-              span.addEventListener('click', (e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(password);
-                window.Blinko.toast.success('✓ Copied');
-              });
-              
-              fragment.appendChild(span);
-              this.processedNodes.add(span);
-              lastIndex = match.index + match[0].length;
-            }
-            
-            if (lastIndex < text.length) {
-              fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
-            }
-            
-            if (textNode.parentNode) {
-              textNode.parentNode.replaceChild(fragment, textNode);
-            }
-          });
-        };
-        
-        // Watch all changes including characterData
-        this.observer = new MutationObserver((mutations) => {
-          let shouldUpdate = false;
-          
-          for (const m of mutations) {
-            if (m.type === 'attributes' && (m.target as Element).classList?.contains('password-field')) continue;
-            if (m.type === 'childList' || m.type === 'characterData') {
-              shouldUpdate = true;
-              break;
-            }
+          if (lastIndex < text.length) {
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
           }
           
-          if (shouldUpdate) {
-            clearTimeout(this.debounceTimer);
-            this.debounceTimer = setTimeout(processContent, 100);
+          if (textNode.parentNode) {
+            textNode.parentNode.replaceChild(fragment, textNode);
           }
         });
-        
-        this.observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-        processContent();
       }
 
       destroy() {
         if (this.observer) {
           this.observer.disconnect();
           this.observer = null;
+        }
+        if (this.styleElement) {
+          this.styleElement.remove();
+          this.styleElement = null;
         }
         clearTimeout(this.debounceTimer);
       }
